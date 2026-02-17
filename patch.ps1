@@ -107,20 +107,28 @@ function Get-ProgressBar {
 Write-Host "=== Step 1: Checking files ===" -ForegroundColor Cyan
 $downloadList = @()
 
+$totalFiles = $JSON.FileList.Count
+$checkedCount = 0
+$corruptCount = 0
+
 foreach ($file in $JSON.FileList) {
     $path = $file.Name
     $size = $file.Size
     $hash = $file.CheckSum.ToLower()
 
     if ($path -eq "nvngx_dlss.dll") {
+        $checkedCount++
         continue
     }
 
-    if ($downloadList.Count % 20 -eq 0) {
-        Write-Host "." -NoNewline
-    }
+    $checkedCount++
+    $percent = [math]::Floor(($checkedCount / $totalFiles) * 100)
+    $progressBar = Get-ProgressBar -Percent $percent -Width 30
+    $statusLine = "`rChecking: $progressBar {0,3}% ({1}/{2}) | Corrupt: {3}" -f $percent, $checkedCount, $totalFiles, $corruptCount
+    Write-Host $statusLine -NoNewline
 
     if (-not (Test-FileIntegrity -Path ".\$path" -ExpectedSize $size -ExpectedHash $hash)) {
+        $corruptCount++
         $downloadList += @{
             Name = $path
             Size = $size
@@ -132,6 +140,7 @@ foreach ($file in $JSON.FileList) {
 }
 
 Write-Host ""
+Write-Host "Check complete: $totalFiles files scanned, $corruptCount corrupted." -ForegroundColor Green
 
 if ($downloadList.Count -eq 0) {
     Write-Host "`n=== All files are OK! ===" -ForegroundColor Green
